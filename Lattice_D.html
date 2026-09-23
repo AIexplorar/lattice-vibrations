@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lattice Vibrations — Phonons in 1D Chains</title>
+<style>
+  :root{
+    --bg:#070b14;
+    --panel:rgba(255,255,255,.045);
+    --brd:rgba(255,255,255,.09);
+    --txt:#e6edf7;
+    --muted:#8ea0bd;
+    --cyan:#22d3ee;
+    --pink:#fb7185;
+    --amber:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    background-image:
+      radial-gradient(1100px 550px at 12% -8%, rgba(34,211,238,.13), transparent 62%),
+      radial-gradient(900px 500px at 92% 108%, rgba(251,113,133,.12), transparent 62%);
+    color:var(--txt);
+    min-height:100vh;
+    padding:16px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{max-width:1400px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+
+  /* ---------- header ---------- */
+  header{padding:4px 6px 2px}
+  header h1{font-size:clamp(18px,2.5vw,27px);font-weight:800;letter-spacing:-.025em}
+  header h1 span{
+    background:linear-gradient(90deg,#22d3ee,#a78bfa,#fb7185);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header p{color:var(--muted);font-size:13.5px;margin-top:5px}
+
+  /* ---------- panels ---------- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--brd);
+    border-radius:16px;
+    backdrop-filter:blur(12px);
+    -webkit-backdrop-filter:blur(12px);
+  }
+  .panel-head{
+    display:flex;align-items:baseline;justify-content:space-between;
+    padding:12px 16px 6px;
+  }
+  .panel-head h2{font-size:14px;font-weight:700;letter-spacing:.02em;color:#cbd8ec}
+  .hint{font-size:11.5px;color:var(--muted)}
+
+  /* ---------- stage ---------- */
+  .stage{position:relative;overflow:hidden}
+  #chainCanvas{width:100%;height:300px;display:block}
+  .stats{
+    position:absolute;top:12px;left:16px;
+    display:flex;gap:20px;flex-wrap:wrap;pointer-events:none;
+  }
+  .stat{display:flex;flex-direction:column;gap:2px}
+  .stat b{font-size:15px;font-weight:700;letter-spacing:-.01em;color:#eaf3ff}
+  .stat span{font-size:10.5px;color:var(--muted);letter-spacing:.02em}
+  .legend{
+    position:absolute;top:14px;right:16px;display:flex;gap:14px;
+    font-size:11.5px;color:var(--muted);pointer-events:none;
+  }
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  .d1{background:#38bdf8;box-shadow:0 0 9px #38bdf8}
+  .d2{background:#fb7185;box-shadow:0 0 9px #fb7185}
+
+  /* ---------- grid ---------- */
+  .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:14px}
+  @media (max-width:920px){.grid{grid-template-columns:1fr}}
+  #dispCanvas{width:100%;height:300px;display:block;cursor:crosshair}
+
+  /* ---------- controls ---------- */
+  .controls{padding-bottom:14px}
+  .cbody{padding:6px 16px 0;display:flex;flex-direction:column;gap:14px}
+  .group{display:flex;flex-direction:column;gap:7px}
+  .group > label{
+    font-size:11.5px;font-weight:600;color:var(--muted);
+    letter-spacing:.05em;text-transform:uppercase;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .val{color:var(--cyan);font-weight:700;font-size:12.5px;letter-spacing:0;text-transform:none}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;
+    background:linear-gradient(90deg,rgba(34,211,238,.55),rgba(167,139,250,.5),rgba(251,113,133,.5));
+    outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#eaf3ff;border:2px solid #0b1220;
+    box-shadow:0 0 0 3px rgba(34,211,238,.22),0 2px 8px rgba(0,0,0,.55);
+    cursor:pointer;transition:box-shadow .15s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 5px rgba(34,211,238,.3),0 2px 10px rgba(0,0,0,.6)}
+  input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:#eaf3ff;border:2px solid #0b1220;
+    box-shadow:0 0 0 3px rgba(34,211,238,.22);cursor:pointer;
+  }
+
+  .segmented{
+    display:flex;background:rgba(255,255,255,.05);
+    border:1px solid var(--brd);border-radius:11px;padding:3px;gap:3px;
+  }
+  .segmented button{
+    flex:1;background:transparent;border:0;color:var(--muted);
+    padding:8px 10px;border-radius:8px;font-size:12.5px;font-weight:700;
+    cursor:pointer;transition:all .18s;font-family:inherit;white-space:nowrap;
+  }
+  .segmented button:hover{color:#dbe7f7;background:rgba(255,255,255,.05)}
+  .segmented button.active{
+    background:linear-gradient(135deg,#22d3ee,#38bdf8);
+    color:#04121a;box-shadow:0 2px 12px rgba(34,211,238,.32);
+  }
+  #branchSeg button[data-branch="optical"].active{
+    background:linear-gradient(135deg,#fb7185,#f43f5e);
+    color:#1a0409;box-shadow:0 2px 12px rgba(251,113,133,.35);
+  }
+
+  .row{display:flex;gap:10px;align-items:center}
+  .btn{
+    background:rgba(255,255,255,.07);border:1px solid var(--brd);color:var(--txt);
+    padding:9px 16px;border-radius:11px;font-size:12.5px;font-weight:700;
+    cursor:pointer;font-family:inherit;transition:all .18s;white-space:nowrap;
+  }
+  .btn:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.2)}
+  .btn:active{transform:scale(.97)}
+
+  .hidden{display:none !important}
+
+  footer{
+    text-align:center;color:var(--muted);font-size:11.5px;
+    padding:6px 0 14px;line-height:1.7;
+  }
+  footer code{
+    background:rgba(255,255,255,.07);padding:1px 6px;border-radius:5px;
+    font-size:11px;color:#a5f3fc;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1>Lattice Vibrations &amp; <span>Phonon Dispersion</span></h1>
+    <p>Interactive 1-D chain model — monoatomic &amp; diatomic lattices</p>
+  </header>
+
+  <!-- ============ ANIMATION STAGE ============ -->
+  <section class="panel stage">
+    <canvas id="chainCanvas"></canvas>
+    <div class="stats">
+      <div class="stat"><b id="statMode">Monoatomic</b><span>mode</span></div>
+      <div class="stat"><b id="statW">0.000</b><span>ω / √(K/m₁)</span></div>
+      <div class="stat"><b id="statLam">—</b><span>λ / a</span></div>
+      <div class="stat"><b id="statVg">—</b><span>v<sub>g</sub> / a√(K/m₁)</span></div>
+    </div>
+    <div class="legend">
+      <span><i class="dot d1"></i>m₁</span>
+      <span id="leg2"><i class="dot d2"></i>m₂</span>
+    </div>
+  </section>
+
+  <!-- ============ GRID ============ -->
+  <div class="grid">
+
+    <!-- dispersion -->
+    <section class="panel plot">
+      <div class="panel-head">
+        <h2>Dispersion relation ω(q)</h2>
+        <span class="hint">click the curve to select a mode</span>
+      </div>
+      <canvas id="dispCanvas"></canvas>
+    </section>
+
+    <!-- controls -->
+    <section class="panel controls">
+      <div class="panel-head"><h2>Controls</h2></div>
+      <div class="cbody">
+
+        <div class="group">
+          <label>Lattice type</label>
+          <div class="segmented" id="typeSeg">
+            <button data-type="mono" class="active">Monoatomic</button>
+            <button data-type="di">Diatomic</button>
+          </div>
+        </div>
+
+        <div class="group hidden" id="branchGroup">
+          <label>Branch</label>
+          <div class="segmented" id="branchSeg">
+            <button data-branch="acoustic" class="active">Acoustic</button>
+            <button data-branch="optical">Optical</button>
+          </div>
+        </div>
+
+        <div class="group">
+          <label>Wave vector q <span class="val" id="qVal">0.25</span></label>
+          <input type="range" id="qSlider" min="0" max="1" step="0.001" value="0.25">
+        </div>
+
+        <div class="group hidden" id="ratioGroup">
+          <label>Mass ratio m₂ / m₁ <span class="val" id="ratioVal">2.00</span></label>
+          <input type="range" id="ratioSlider" min="1" max="5" step="0.05" value="2">
+        </div>
+
+        <div class="group">
+          <label>Spring constant K <span class="val" id="kVal">1.00</span></label>
+          <input type="range" id="kSlider" min="0.3" max="2.5" step="0.05" value="1">
+        </div>
+
+        <div class="group">
+          <label>Animation speed <span class="val" id="speedVal">1.00×</span></label>
+          <input type="range" id="speedSlider" min="0" max="2.5" step="0.05" value="1">
+        </div>
+
+        <div class="group">
+          <label>Displacement</label>
+          <div class="segmented" id="modeSeg">
+            <button data-mode="transverse" class="active">Transverse</button>
+            <button data-mode="longitudinal">Longitudinal</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="playBtn">⏸ Pause</button>
+          <button class="btn" id="resetBtn">↺ Reset time</button>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    Units: <code>a = 1</code>, <code>m₁ = 1</code>, <code>K</code> adjustable &nbsp;•&nbsp;
+    ω in √(K/m₁) &nbsp;•&nbsp; v<sub>g</sub> in a√(K/m₁)
+  </footer>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* =========================================================
+     CONSTANTS & STATE
+     ========================================================= */
+  const LAT = 1;      // nearest-neighbour spacing a
+  const M1  = 1;      // mass of light atom (unit)
+
+  const state = {
+    type: 'mono',          // 'mono' | 'di'
+    qn: 0.25,              // normalized wave vector 0..1 (fraction of BZ)
+    branch: 'acoustic',    // 'acoustic' | 'optical'  (diatomic only)
+    ratio: 2,              // m2 / m1
+    K: 1,
+    speed: 1,
+    playing: true,
+    mode: 'transverse',    // 'transverse' | 'longitudinal'
+    t: 0
+  };
+
+  let dispDirty = true;
+
+  /* =========================================================
+     DOM
+     ========================================================= */
+  const chainCanvas = document.getElementById('chainCanvas');
+  const cctx = chainCanvas.getContext('2d');
+  const dispCanvas  = document.getElementById('dispCanvas');
+  const dctx = dispCanvas.getContext('2d');
+
+  const el = {
+    statMode:  document.getElementById('statMode'),
+    statW:     document.getElementById('statW'),
+    statLam:   document.getElementById('statLam'),
+    statVg:    document.getElementById('statVg'),
+    leg2:      document.getElementById('leg2'),
+    branchGroup: document.getElementById('branchGroup'),
+    ratioGroup:  document.getElementById('ratioGroup'),
+    qVal:      document.getElementById('qVal'),
+    ratioVal:  document.getElementById('ratioVal'),
+    kVal:      document.getElementById('kVal'),
+    speedVal:  document.getElementById('speedVal'),
+    qSlider:   document.getElementById('qSlider'),
+    ratioSlider: document.getElementById('ratioSlider'),
+    kSlider:   document.getElementById('kSlider'),
+    speedSlider: document.getElementById('speedSlider'),
+    playBtn:   document.getElementById('playBtn'),
+    resetBtn:  document.getElementById('resetBtn'),
+    typeSeg:   document.getElementById('typeSeg'),
+    branchSeg: document.getElementById('branchSeg'),
+    modeSeg:   document.getElementById('modeSeg')
+  };
+
+  /* =========================================================
+     CANVAS SIZING
+     ========================================================= */
+  function ensureSize(canvas, ctx) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 300;
+    const h = canvas.clientHeight || 150;
+    const W = Math.round(w * dpr);
+    const H = Math.round(h * dpr);
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { w, h };
+  }
+
+  /* =========================================================
+     PHYSICS
+     ========================================================= */
+
+  // ω(q) for the monoatomic chain  (ω = 2√(K/m)|sin(qa/2)|)
+  function omegaMono(qn) {
+    const q = qn * Math.PI / LAT;
+    return 2 * Math.sqrt(state.K / M1) * Math.abs(Math.sin(q * LAT / 2));
+  }
+
+  // ω(q) for a given branch of the diatomic chain
+  function omegaDi(qn, branch) {
+    const m1 = M1, m2 = M1 * state.ratio, K = state.K;
+    const q = qn * Math.PI / (2 * LAT);
+    const S = 1 / m1 + 1 / m2;
+    const P = 1 / (m1 * m2);
+    const s2 = Math.sin(q * LAT) ** 2;
+    const disc = Math.sqrt(Math.max(0, S * S - 4 * P * s2));
+    const sign = branch === 'optical' ? 1 : -1;
+    return Math.sqrt(Math.max(0, K * (S + sign * disc)));
+  }
+
+  function omegaAt(qn) {
+    return state.type === 'mono' ? omegaMono(qn) : omegaDi(qn, state.branch);
+  }
+
+  // Full mode info: q, ω, eigenvector (u1, u2)
+  function getMode() {
+    const K = state.K;
+
+    if (state.type === 'mono') {
+      const q = state.qn * Math.PI / LAT;
+      const w = 2 * Math.sqrt(K / M1) * Math.abs(Math.sin(q * LAT / 2));
+      return { q, w, m1: M1, m2: M1, u1: 1, u2: 1, di: false };
+    }
+
+    const m1 = M1, m2 = M1 * state.ratio;
+    const q = state.qn * Math.PI / (2 * LAT);
+    const S = 1 / m1 + 1 / m2;
+    const P = 1 / (m1 * m2);
+    const s2 = Math.sin(q * LAT) ** 2;
+    const disc = Math.sqrt(Math.max(0, S * S - 4 * P * s2));
+    const sign = state.branch === 'optical' ? 1 : -1;
+    const w2 = Math.max(0, K * (S + sign * disc));
+    const w = Math.sqrt(w2);
+
+    // eigenvector from the dynamical matrix
+    const c  = 2 * K * Math.cos(q * LAT);
+    const d1 = 2 * K - m1 * w2;
+    const d2 = 2 * K - m2 * w2;
+
+    let u1, u2;
+    if (Math.hypot(d2, c) >= Math.hypot(c, d1)) { u1 = d2; u2 = c; }
+    else                                        { u1 = c;  u2 = d1; }
+
+    const nrm = Math.max(Math.abs(u1), Math.abs(u2));
+    if (nrm < 1e-9) {
+      if (state.branch === 'optical') { u1 = 1; u2 = 0; }
+      else                            { u1 = 0; u2 = 1; }
+    } else {
+      u1 /= nrm; u2 /= nrm;
+    }
+    return { q, w, m1, m2, u1, u2, di: true };
+  }
+
+  // group velocity  v_g = dω/dq  (units of a√(K/m₁))
+  function groupVelocity() {
+    const qmax = state.type === 'mono' ? Math.PI / LAT : Math.PI / (2 * LAT);
+    const h = 1e-3;
+    const a = Math.max(0, state.qn - h);
+    const b = Math.min(1, state.qn + h);
+    if (b - a < 1e-9) return 0;
+    const dw = omegaAt(b) - omegaAt(a);
+    return (dw / (b - a)) / qmax;
+  }
+
+  /* =========================================================
+     DRAWING HELPERS
+     ========================================================= */
+  function drawSpring(ctx, x1, y1, x2, y2, amp) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const px = -uy, py = ux;
+    const coils = Math.max(4, Math.min(9, Math.round(len / 13)));
+    const n = coils * 2;
+    const a = Math.min(amp, len * 0.13);
+
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    for (let i = 0; i < n; i++) {
+      const t = (i + 0.5) / n;
+      const off = (i % 2 === 0 ? 1 : -1) * a;
+      ctx.lineTo(x1 + dx * t + px * off, y1 + dy * t + py * off);
+    }
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  function drawAtom(ctx, x, y, r, c1, c2, glow) {
+    ctx.save();
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 16;
+    const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.12, x, y, r);
+    g.addColorStop(0, c1);
+    g.addColorStop(1, c2);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* =========================================================
+     DRAW THE CHAIN
+     ========================================================= */
+  function drawChain() {
+    const { w: W, h: H } = ensureSize(chainCanvas, cctx);
+    const ctx = cctx;
+    ctx.clearRect(0, 0, W, H);
+
+    const p = getMode();
+    const N = state.type === 'mono' ? 41 : 40;
+    const margin = Math.max(34, W * 0.045);
+    const s = (W - 2 * margin) / (N - 1);
+    const cy = H * 0.52;
+
+    const transverse = state.mode === 'transverse';
+    const ampPix = transverse
+      ? Math.min(38, H * 0.25)
+      : Math.min(9, s * 0.20);
+
+    // --- equilibrium guide line ---
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148,163,184,0.10)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 7]);
+    ctx.beginPath();
+    ctx.moveTo(margin - 22, cy);
+    ctx.lineTo(W - margin + 22, cy);
+    ctx.stroke();
+    ctx.restore();
+
+    // --- build atom list ---
+    const atoms = [];
+    for (let n = 0; n < N; n++) {
+      const x0 = margin + n * s;
+      const xr = n * LAT;
+      let disp, mass, species;
+
+      if (state.type === 'mono') {
+        species = 0;
+        mass = p.m1;
+        disp = Math.cos(p.q * xr - p.w * state.t);
+      } else {
+        species = n % 2;                          // 0 -> m1, 1 -> m2
+        mass = species === 0 ? p.m1 : p.m2;
+        const C = species === 0 ? p.u1 : p.u2;
+        disp = C * Math.cos(p.q * xr - p.w * state.t);
+      }
+
+      const px = x0 + (transverse ? 0 : disp * ampPix);
+      const py = cy + (transverse ? disp * ampPix : 0);
+      atoms.push({ x0, px, py, mass, species });
+    }
+
+    // --- equilibrium marks in longitudinal mode ---
+    if (!transverse) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(148,163,184,0.22)';
+      for (const a of atoms) {
+        ctx.beginPath();
+        ctx.arc(a.x0, cy, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // --- springs ---
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148,163,184,0.42)';
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < atoms.length - 1; i++) {
+      drawSpring(ctx, atoms[i].px, atoms[i].py, atoms[i + 1].px, atoms[i + 1].py, 4);
+    }
+    ctx.restore();
+
+    // --- atoms ---
+    for (const a of atoms) {
+      const r = 5.5 * Math.cbrt(a.mass) + 2.2;
+      if (state.type === 'mono') {
+        drawAtom(ctx, a.px, a.py, r, '#a5f3fc', '#0ea5e9', 'rgba(34,211,238,0.85)');
+      } else if (a.species === 0) {
+        drawAtom(ctx, a.px, a.py, r, '#bae6fd', '#0284c7', 'rgba(56,189,248,0.85)');
+      } else {
+        drawAtom(ctx, a.px, a.py, r, '#fecdd3', '#e11d48', 'rgba(251,113,133,0.85)');
+      }
+    }
+
+    // --- direction arrow hint ---
+    ctx.save();
+    ctx.fillStyle = 'rgba(148,163,184,0.45)';
+    ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(transverse ? '↓ displacement (transverse)' : '↔ displacement (longitudinal)',
+                 margin - 22, H - 14);
+    ctx.restore();
+  }
+
+  /* =========================================================
+     DISPERSION PLOT
+     ========================================================= */
+  function dispLayout(W, H) {
+    const L = 58, R = 22, T = 24, B = 44;
+    const pw = W - L - R;
+    const ph = H - T - B;
+
+    const mono = state.type === 'mono';
+    const raw = mono
+      ? 2 * Math.sqrt(state.K / M1)
+      : Math.sqrt(2 * state.K * (1 / M1 + 1 / (M1 * state.ratio)));
+
+    const wMax = Math.max(0.5, Math.ceil(raw * 1.08 * 2) / 2);
+
+    return {
+      L, R, T, B, pw, ph, wMax, mono,
+      X: qn => L + qn * pw,
+      Y: w  => T + ph - (w / wMax) * ph,
+      qnFromX: x => (x - L) / pw
+    };
+  }
+
+  function drawDispersion() {
+    const { w: W, h: H } = ensureSize(dispCanvas, dctx);
+    const ctx = dctx;
+    ctx.clearRect(0, 0, W, H);
+
+    const P = dispLayout(W, H);
+    const { L, T, pw, ph, wMax, X, Y } = P;
+
+    // background
+    ctx.fillStyle = 'rgba(255,255,255,0.022)';
+    ctx.fillRect(L, T, pw, ph);
+
+    // grid
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148,163,184,0.12)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const x = L + pw * i / 4;
+      ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
+    }
+    for (let i = 0; i <= 4; i++) {
+      const y = T + ph * i / 4;
+      ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke();
+    }
+    ctx.restore();
+
+    /* ---- band gap shading (diatomic) ---- */
+    if (!P.mono && state.ratio > 1.0001) {
+      const wTop = Math.sqrt(2 * state.K / M1);                    // bottom of optical band
+      const wBot = Math.sqrt(2 * state.K / (M1 * state.ratio));    // top of acoustic band
+      const yTop = Y(wTop), yBot = Y(wBot);
+      if (yBot - yTop > 1) {
+        const g = ctx.createLinearGradient(0, yTop, 0, yBot);
+        g.addColorStop(0, 'rgba(251,113,133,0.20)');
+        g.addColorStop(1, 'rgba(251,113,133,0.05)');
+        ctx.fillStyle = g;
+        ctx.fillRect(L, yTop, pw, yBot - yTop);
+
+        ctx.save();
+        ctx.fillStyle = 'rgba(251,113,133,0.75)';
+        ctx.font = '600 10.5px ui-sans-serif, system-ui, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('band gap', L + pw - 8, (yTop + yBot) / 2 + 3.5);
+        ctx.restore();
+      }
+    }
+
+    /* ---- curves ---- */
+    const NPT = 260;
+
+    const strokeCurve = (fn, color, glow) => {
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= NPT; i++) {
+        const qn = i / NPT;
+        const x = X(qn), y = Y(fn(qn));
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.6;
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 12;
+      ctx.stroke();
+      ctx.restore();
+    };
+
+    if (P.mono) {
+      strokeCurve(omegaMono, '#22d3ee', 'rgba(34,211,238,0.65)');
+    } else {
+      strokeCurve(qn => omegaDi(qn, 'acoustic'), '#22d3ee', 'rgba(34,211,238,0.65)');
+      strokeCurve(qn => omegaDi(qn, 'optical'),  '#fb7185', 'rgba(251,113,133,0.65)');
+    }
+
+    /* ---- current mode marker ---- */
+    const wNow = omegaAt(state.qn);
+    const mx = X(state.qn), my = Y(wNow);
+
+    ctx.save();
+    ctx.setLineDash([4, 5]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, T + ph); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(L, my); ctx.stroke();
+    ctx.restore();
+
+    const markerColor = (!P.mono && state.branch === 'optical') ? '#fb7185' : '#22d3ee';
+    ctx.save();
+    ctx.shadowColor = markerColor;
+    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(mx, my, 5.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = markerColor;
+    ctx.beginPath(); ctx.arc(mx, my, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    /* ---- axes ---- */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148,163,184,0.45)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(L, T); ctx.lineTo(L, T + ph); ctx.lineTo(L + pw, T + ph); ctx.stroke();
+
+    ctx.fillStyle = 'rgba(148,163,184,0.85)';
+    ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+
+    // y ticks
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const v = wMax * i / 4;
+      const y = Y(v);
+      ctx.fillText(v.toFixed(1), L - 9, y);
+    }
+
+    // x ticks
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const qLabel = P.mono ? 'π/a' : 'π/2a';
+    ctx.fillText('0', L, T + ph + 8);
+    ctx.fillText(qLabel, L + pw, T + ph + 8);
+
+    // axis titles
+    ctx.fillStyle = 'rgba(203,216,236,0.9)';
+    ctx.font = '600 11.5px ui-sans-serif, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('ω', L - 40, T - 8);
+    ctx.textAlign = 'right';
+    ctx.fillText('q  →', L + pw, T + ph + 26);
+    ctx.restore();
+  }
+
+  /* =========================================================
+     READOUTS
+     ========================================================= */
+  function refresh() {
+    const p = getMode();
+
+    el.statMode.textContent =
+      state.type === 'mono' ? 'Monoatomic'
+                            : (state.branch === 'optical' ? 'Optical' : 'Acoustic');
+
+    el.statW.textContent = p.w.toFixed(3);
+
+    const lam = p.q > 1e-6 ? (2 * Math.PI / p.q) : Infinity;
+    el.statLam.textContent = isFinite(lam) ? lam.toFixed(2) : '∞';
+
+    el.statVg.textContent = groupVelocity().toFixed(3);
+
+    dispDirty = true;
+  }
+
+  /* =========================================================
+     UI WIRING
+     ========================================================= */
+  function setSegmented(container, attr, value) {
+    container.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('active', b.dataset[attr] === value);
+    });
+  }
+
+  // ---- lattice type ----
+  el.typeSeg.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    state.type = btn.dataset.type;
+    setSegmented(el.typeSeg, 'type', state.type);
+
+    const isDi = state.type === 'di';
+    el.branchGroup.classList.toggle('hidden', !isDi);
+    el.ratioGroup.classList.toggle('hidden', !isDi);
+    el.leg2.style.display = isDi ? '' : 'none';
+
+    if (isDi && state.branch === 'acoustic' && state.qn === 0) state.qn = 0.3;
+    refresh();
+  });
+
+  // ---- branch ----
+  el.branchSeg.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    state.branch = btn.dataset.branch;
+    setSegmented(el.branchSeg, 'branch', state.branch);
+    refresh();
+  });
+
+  // ---- q ----
+  el.qSlider.addEventListener('input', () => {
+    state.qn = parseFloat(el.qSlider.value);
+    el.qVal.textContent = state.qn.toFixed(3);
+    refresh();
+  });
+
+  // ---- mass ratio ----
+  el.ratioSlider.addEventListener('input', () => {
+    state.ratio = parseFloat(el.ratioSlider.value);
+    el.ratioVal.textContent = state.ratio.toFixed(2);
+    refresh();
+  });
+
+  // ---- spring constant ----
+  el.kSlider.addEventListener('input', () => {
+    state.K = parseFloat(el.kSlider.value);
+    el.kVal.textContent = state.K.toFixed(2);
+    refresh();
+  });
+
+  // ---- speed ----
+  el.speedSlider.addEventListener('input', () => {
+    state.speed = parseFloat(el.speedSlider.value);
+    el.speedVal.textContent = state.speed.toFixed(2) + '×';
+  });
+
+  // ---- displacement mode ----
+  el.modeSeg.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    state.mode = btn.dataset.mode;
+    setSegmented(el.modeSeg, 'mode', state.mode);
+  });
+
+  // ---- play / pause ----
+  el.playBtn.addEventListener('click', () => {
+    state.playing = !state.playing;
+    el.playBtn.textContent = state.playing ? '⏸ Pause' : '▶ Play';
+  });
+
+  // ---- reset time ----
+  el.resetBtn.addEventListener('click', () => { state.t = 0; });
+
+  // ---- click the dispersion plot ----
+  dispCanvas.addEventListener('click', e => {
+    const rect = dispCanvas.getBoundingClientRect();
+    const W = rect.width, H = rect.height;
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const P = dispLayout(W, H);
+
+    let qn = P.qnFromX(mx);
+    qn = Math.min(1, Math.max(0, qn));
+    state.qn = qn;
+    el.qSlider.value = qn;
+    el.qVal.textContent = qn.toFixed(3);
+
+    if (!P.mono) {
+      // choose whichever branch is vertically closest
+      const yA = P.Y(omegaDi(qn, 'acoustic'));
+      const yO = P.Y(omegaDi(qn, 'optical'));
+      state.branch = Math.abs(my - yA) <= Math.abs(my - yO) ? 'acoustic' : 'optical';
+      setSegmented(el.branchSeg, 'branch', state.branch);
+    }
+    refresh();
+  });
+
+  // ---- resize ----
+  window.addEventListener('resize', () => { dispDirty = true; });
+
+  /* =========================================================
+     MAIN LOOP
+     ========================================================= */
+  let prev = performance.now();
+
+  function loop(now) {
+    const dt = Math.min(0.05, (now - prev) / 1000);
+    prev = now;
+
+    if (state.playing) {
+      state.t += dt * state.speed;
+      if (state.t > 1e7) state.t = 0;   // keep precision healthy
+    }
+
+    drawChain();
+    if (dispDirty) { drawDispersion(); dispDirty = false; }
+
+    requestAnimationFrame(loop);
+  }
+
+  /* =========================================================
+     INIT
+     ========================================================= */
+  function init() {
+    // start in the optical branch when diatomic is chosen
+    state.branch = 'optical';
+    setSegmented(el.branchSeg, 'branch', 'optical');
+    refresh();
+    requestAnimationFrame(loop);
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>
